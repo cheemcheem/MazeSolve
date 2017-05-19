@@ -1,35 +1,37 @@
-import com.sun.istack.internal.Nullable;
-
 import javax.imageio.ImageIO;
 import java.awt.*;
 import java.awt.image.BufferedImage;
-import java.awt.image.RenderedImage;
 import java.io.File;
 import java.io.IOException;
 
-import static java.awt.image.BufferedImage.TYPE_INT_ARGB;
-
 /**
- * Created by kathancheema on 18/05/2017.
+ * Solves Mazes.
  */
 public class Solve {
 
-    private static BufferedImage maze;
     private static int w;
     private static int h;
 
+    private static int entryX;
+    private static int entryY;
+    private static int exitX;
+    private static int exitY;
 
     public static void main(String[] args) {
-
         try {
-            maze = getImage(args[0]);
+            BufferedImage maze = getImage(args[0]);
             Color colours[] = getPixelColours(maze);
             findPoints(maze);
+            Solver(maze, entryX, entryY);
+
+//            draw(0,350,40,350,maze);
+//            ImageIO.write(maze, "jpg", new File("output.jpg"));
+
 //            for (int pixel: maze.getRGB(0,0, w, h, null, 0, w)) {
 ////                System.out.println("Pixel " + ++count + " " + new Color(pixel).toString());
 //            }
         } catch (IOException e) {
-            System.out.println("Couldn't read: " + args[0] + "\n" + e);
+            System.out.println("Couldn't read/write: " + args[0] + "\n" + e);
             System.exit(1);
         } catch (ArrayIndexOutOfBoundsException e) {
             System.out.println("No args, exiting");
@@ -38,19 +40,109 @@ public class Solve {
 
     }
 
+    private static void output(BufferedImage maze) throws IOException {
+        ImageIO.write(maze, "png", new File("output.png"));
+    }
+
+    private static void draw(int startX, int startY, int endX, int endY, BufferedImage maze) {
+        int xDiff = endX - startX;
+        int yDiff = endY - startY;
+
+        int xMult = (xDiff >= 1) ? 1 : -1;
+        int yMult = (yDiff >= 1) ? 1 : -1;
+
+        if (yDiff > 0 && xDiff > 0) {
+            System.out.println("Multiple Diffs");
+            System.exit(1);
+        }
+
+        if (xDiff > 0) {
+            for (int i = 0; i < xDiff; i++) {
+                maze.setRGB(startX + (i * xMult), startY, Color.RED.getRGB());
+            }
+        } else if (yDiff > 0) {
+            for (int i = 0; i < yDiff; i++) {
+                maze.setRGB(startX, startY + (i * yMult), Color.RED.getRGB());
+            }
+        }
+    }
+
     private static void findPoints(BufferedImage maze) {
 
-        int startX = 0;
-        int startY = 0;
-        int endX = 0;
-        int endY = 0;
-        for (int i = 0; i < w; i ++) {
-            Color col = new Color(maze.getRGB(i, h/2));
-
-            if (col != Color.WHITE) {
-                System.out.println("Found black x = " + i + " y = " + h/2);
+        // Looking for x,y on left side for entrance
+        for (int x = 0; x < w; x++) {
+            Color col = new Color(maze.getRGB(x, h / 2));
+            if (col.equals(Color.BLACK)) {
+                System.out.println("Found entry wall x = " + x + " y = " + h / 2);
+                entryX = x;
                 break;
             }
+        }
+        if (entryX == 0) {
+            System.out.println("No entrance wall" + h + " " + w);
+            System.exit(1);
+        }
+        boolean passedBottomGap = false;
+        for (int y = 0; y < h; y++) {
+            Color col = new Color(maze.getRGB(entryX, y));
+            if (passedBottomGap) {
+
+                if (col.equals(Color.WHITE)) {
+                    if (entryY == 0) {
+                        System.out.println("Found entry opening x = " + entryX + " y = " + y);
+                        entryY = y;
+                        break;
+                    }
+                }
+
+            } else {
+                if (col.equals(Color.BLACK)) {
+                    passedBottomGap = true;
+                }
+            }
+        }
+
+        if (entryY == 0) {
+            System.out.println("No entrance opening");
+            System.exit(1);
+        }
+
+        // Looking for x,y on right side for exit
+        for (int x = 0; x < w; x++) {
+            Color col = new Color(maze.getRGB(w - x - 1, h / 2));
+            if (col.equals(Color.BLACK)) {
+                System.out.println("Found entry wall x = " + (w - x - 1) + " y = " + h / 2);
+                exitX = w - x - 1;
+                break;
+            }
+        }
+        if (exitX == 0) {
+            System.out.println("No exit wall");
+            System.exit(1);
+        }
+
+        passedBottomGap = false;
+        for (int y = 0; y < h; y++) {
+            Color col = new Color(maze.getRGB(exitX, h - y - 1));
+            if (passedBottomGap) {
+                if (col.equals(Color.WHITE)) {
+                    if (exitY == 0) {
+                        System.out.println("Found exit opening x = " + exitX + " y = " + (h - y - 1));
+                        exitY = h - y - 1;
+                        break;
+                    }
+                }
+
+            } else {
+                if (col.equals(Color.BLACK)) {
+                    passedBottomGap = true;
+                }
+            }
+        }
+
+        if (exitY == 0) {
+            System.out.println("No exit opening");
+            System.exit(1);
         }
     }
 
@@ -72,22 +164,99 @@ public class Solve {
         return ImageIO.read(new File(Location));
     }
 
-    private static void outputMaze(Color maze[]) {
-        int rbgs[] = new int[1];
+    private static void Solver(BufferedImage maze, int x, int y) {
+        System.out.println("x = [" + x + "], y = [" + y + "]");
+        if (x < entryX) {
+            return;
+        }
+        if (x == exitX && y == exitY) {
+            System.out.println("Finished!");
+            try {
+                output(maze);
+            } catch (IOException e) {
+                System.out.println("Couldn't output" + e);
+            }
+            System.exit(0);
+        }
+        int red = Color.RED.getRGB();
+        int black = Color.BLACK.getRGB();
 
-        for (int i = 0; i < maze.length; i++) {
-            rbgs[i] = maze[i].getRGB();
+        int fact = 1;
+        boolean up = true;
+        boolean down = true;
+        boolean left = true;
+        boolean right = true;
+
+        for (int i = 1; i <= fact; i++) {
+            try {
+                if (up && (maze.getRGB(x, y + i) == red || maze.getRGB(x, y + i) == black)) {
+                    up = false;
+                }
+            } catch (ArrayIndexOutOfBoundsException e) {
+                up = false;
+            }
+            try {
+                if (down && (maze.getRGB(x, y - i) == red || maze.getRGB(x, y - i) == black)) {
+                    down = false;
+                }
+            } catch (ArrayIndexOutOfBoundsException e) {
+                down = false;
+            }
+            try {
+                if (left && (maze.getRGB(x - 1, y) == red || maze.getRGB(x - 1, y) == black)) {
+                    left = false;
+                }
+            } catch (ArrayIndexOutOfBoundsException e) {
+                left = false;
+            }
+            try {
+                if (right && (maze.getRGB(x + 1, y) == red || maze.getRGB(x + 1, y) == black)) {
+                    right = false;
+                }
+            } catch (ArrayIndexOutOfBoundsException e) {
+                right = false;
+            }
         }
 
-        BufferedImage solved = new BufferedImage(Solve.maze.getWidth(), Solve.maze.getHeight(), Solve.maze.getType());
-
-        try {
-            ImageIO.write(solved, "jpg", new File("output.jpg"));
-        } catch (IOException e) {
-            System.out.println("Failed to output");
+        if (up) {
+            BufferedImage mazeCpy = maze.getSubimage(0, 0, w, h);
+            draw(x, y, x, y + fact, mazeCpy);
+            Solver(mazeCpy, x, y + fact);
+        }
+        if (down) {
+            BufferedImage mazeCpy = maze.getSubimage(0, 0, w, h);
+            draw(x, y, x, y - fact, mazeCpy);
+            Solver(mazeCpy, x, y - fact);
+        }
+        if (left) {
+            BufferedImage mazeCpy = maze.getSubimage(0, 0, w, h);
+            draw(x, y, x - fact, y, mazeCpy);
+            Solver(mazeCpy, x - fact, y);
+        }
+        if (right) {
+            BufferedImage mazeCpy = maze.getSubimage(0, 0, w, h);
+            draw(x, y, x + fact, y, mazeCpy);
+            Solver(mazeCpy, x + fact, y);
         }
 
     }
+
+//    private static void outputMaze(Color maze[]) {
+//        int rbgs[] = new int[maze.length];
+//
+//        for (int i = 0; i < maze.length; i++) {
+//            rbgs[i] = maze[i].getRGB();
+//        }
+//
+//        BufferedImage solved = new BufferedImage(Solve.maze.getWidth(), Solve.maze.getHeight(), Solve.maze.getType());
+//
+//        try {
+//            ImageIO.write(solved, "jpg", new File("output.jpg"));
+//        } catch (IOException e) {
+//            System.out.println("Failed to output");
+//        }
+//
+//    }
 
 //    private static boolean checkMaze(Color maze[]) {
 //
